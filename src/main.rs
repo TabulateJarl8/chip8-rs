@@ -1,45 +1,43 @@
-use minifb::{Key, Window, WindowOptions};
+use minifb::{Key, KeyRepeat, Window, WindowOptions};
 
-use crate::virtual_buffer::{PixelState, VirtualDisplay};
+use crate::emulator::Chip8;
 
 mod emulator;
+mod memory;
+mod stack;
 mod virtual_buffer;
 
 fn main() {
-    let mut buffer = VirtualDisplay::new(20);
+    let mut emulator = Chip8::new();
 
     let mut window = Window::new(
         "CHIP-8 Emulator",
-        buffer.scaled_width(),
-        buffer.scaled_height(),
+        emulator.window().scaled_width(),
+        emulator.window().scaled_height(),
         WindowOptions::default(),
     )
     .unwrap_or_else(|e| panic!("{}", e));
 
     window.set_target_fps(60);
 
-    for i in 0..64 {
-        if i % 2 == 0 {
-            buffer.set_pixel(i, 0, PixelState::On);
-        }
-    }
+    let data = include_bytes!("1-chip8-logo.ch8");
+    emulator.load(data);
 
-    buffer.set_pixel(5, 5, PixelState::On);
-    buffer.set_pixel(6, 5, PixelState::On);
-    buffer.set_pixel(7, 5, PixelState::On);
-    buffer.set_pixel(5, 6, PixelState::On);
-    buffer.set_pixel(6, 6, PixelState::On);
-    buffer.set_pixel(7, 6, PixelState::On);
-    buffer.set_pixel(5, 7, PixelState::On);
-    buffer.set_pixel(6, 7, PixelState::On);
-    buffer.set_pixel(7, 7, PixelState::On);
+    println!("{:?}", emulator);
 
     while window.is_open() && !window.is_key_down(Key::Escape) {
+        emulator.press_keys(&window.get_keys_pressed(KeyRepeat::No));
+        emulator.release_keys(&window.get_keys_released());
+
+        emulator.tick();
+        println!("{:?}", emulator);
+
+        let emu_window = emulator.window();
         window
             .update_with_buffer(
-                buffer.to_framebuffer(),
-                buffer.scaled_width(),
-                buffer.scaled_height(),
+                &emu_window.to_framebuffer(),
+                emu_window.scaled_width(),
+                emu_window.scaled_height(),
             )
             .unwrap();
     }
