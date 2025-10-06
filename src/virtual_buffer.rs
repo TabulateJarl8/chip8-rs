@@ -93,7 +93,7 @@ impl VirtualDisplay {
             for bit in 0..8 {
                 let coord_x = x + bit;
 
-                let value = bits & (1 << 7 - bit);
+                let value = bits & (1 << (7 - bit));
                 if value > 0 {
                     collision |= self.set_pixel(coord_x, coord_y, true);
                 }

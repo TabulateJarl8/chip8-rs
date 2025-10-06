@@ -190,14 +190,14 @@ impl Chip8 {
 
                 let (new_value, overflow) = vy.overflowing_sub(vx);
 
-                self.v_registers[0xF] = overflow.into();
+                self.v_registers[0xF] = (!overflow).into();
                 self.v_registers[reg_x as usize] = new_value;
             }
             (8, reg_x, _, 0xE) => {
                 let vx = self.v_registers[reg_x as usize];
 
                 // set overflow register to most significant bit
-                self.v_registers[0xF] = vx & 0x80;
+                self.v_registers[0xF] = (vx >> 7) & 1;
                 self.v_registers[reg_x as usize] <<= 1;
             }
 
@@ -301,14 +301,14 @@ impl Chip8 {
             }
 
             (0xF, reg_x, 5, 5) => {
-                for reg in 0..reg_x {
+                for reg in 0..=reg_x {
                     let addr = (self.index_register + reg) as usize;
                     self.memory[addr] = self.v_registers[reg as usize];
                 }
             }
 
             (0xF, reg_x, 6, 5) => {
-                for reg in 0..reg_x {
+                for reg in 0..=reg_x {
                     let addr = (self.index_register + reg) as usize;
                     self.v_registers[reg as usize] = self.memory[addr];
                 }
