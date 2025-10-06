@@ -2,6 +2,7 @@ use minifb::{Key, Window, WindowOptions};
 
 use crate::virtual_buffer::{PixelState, VirtualDisplay};
 
+mod emulator;
 mod virtual_buffer;
 
 fn main() {

@@ -40,6 +40,10 @@ impl VirtualDisplay {
         self.scaled_height
     }
 
+    pub fn clear(&mut self) {
+        self.buffer.clear();
+    }
+
     pub fn to_framebuffer(&self) -> &[u32] {
         &self.buffer
     }
