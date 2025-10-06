@@ -8,6 +8,8 @@ mod stack;
 mod virtual_buffer;
 
 fn main() {
+    env_logger::init();
+
     let mut emulator = Chip8::new();
 
     let mut window = Window::new(
@@ -23,14 +25,11 @@ fn main() {
     let data = include_bytes!("1-chip8-logo.ch8");
     emulator.load(data);
 
-    println!("{:?}", emulator);
-
     while window.is_open() && !window.is_key_down(Key::Escape) {
         emulator.press_keys(&window.get_keys_pressed(KeyRepeat::No));
         emulator.release_keys(&window.get_keys_released());
 
         emulator.tick();
-        println!("{:?}", emulator);
 
         let emu_window = emulator.window();
         window

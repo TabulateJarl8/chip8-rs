@@ -106,29 +106,32 @@ impl Chip8 {
     }
 
     fn execute(&mut self, opcode: u16) {
-        let high_nibble1 = (opcode & 0xF000) >> 12;
-        let high_nibble2 = (opcode & 0x0F00) >> 8;
-        let low_nibble1 = (opcode & 0x00F0) >> 4;
-        let low_nibble2 = opcode & 0x000F;
+        log::debug!("PC: {}", self.program_counter);
+        log::debug!("Executing opcode: 0x{:04x}", opcode);
 
-        match (high_nibble1, high_nibble2, low_nibble1, low_nibble2) {
+        let bit1 = (opcode & 0xF000) >> 12;
+        let bit2 = (opcode & 0x0F00) >> 8;
+        let bit3 = (opcode & 0x00F0) >> 4;
+        let bit4 = opcode & 0x000F;
+
+        match (bit1, bit2, bit3, bit4) {
             (0, 0, 0, 0) => (),
             (0, 0, 0xE, 0) => self.window.clear(),
             (0, 0, 0xE, 0xE) => self.program_counter = self.stack.pop(),
-            (1, n1, n2, n3) => {
-                self.program_counter = n1 | n2 | n3;
+            (1, _, _, _) => {
+                self.program_counter = opcode & 0xFFF;
             }
-            (2, n1, n2, n3) => {
+            (2, _, _, _) => {
                 self.stack.push(self.program_counter);
-                self.program_counter = n1 | n2 | n3;
+                self.program_counter = opcode & 0xFFF;
             }
-            (3, reg, n1, n2) => {
-                if self.v_registers[reg as usize] as u16 == n1 | n2 {
+            (3, reg, _, _) => {
+                if self.v_registers[reg as usize] as u16 == opcode & 0xFF {
                     self.program_counter += 2;
                 }
             }
-            (4, reg, n1, n2) => {
-                if self.v_registers[reg as usize] as u16 != n1 | n2 {
+            (4, reg, _, _) => {
+                if self.v_registers[reg as usize] as u16 != opcode & 0xFF {
                     self.program_counter += 2;
                 }
             }
@@ -137,11 +140,11 @@ impl Chip8 {
                     self.program_counter += 2;
                 }
             }
-            (6, reg, n1, n2) => {
-                self.v_registers[reg as usize] = (n1 | n2) as u8;
+            (6, reg, _, _) => {
+                self.v_registers[reg as usize] = (opcode & 0xFF) as u8;
             }
-            (7, reg, n1, n2) => {
-                self.v_registers[reg as usize] += (n1 | n2) as u8;
+            (7, reg, _, _) => {
+                self.v_registers[reg as usize] += (opcode & 0xFF) as u8;
             }
             (8, reg_x, reg_y, 0) => {
                 self.v_registers[reg_x as usize] = self.v_registers[reg_y as usize];
@@ -197,16 +200,16 @@ impl Chip8 {
                 }
             }
 
-            (0xA, n1, n2, n3) => {
-                self.index_register = n1 | n2 | n3;
+            (0xA, _, _, _) => {
+                self.index_register = opcode & 0xFFF;
             }
 
-            (0xB, n1, n2, n3) => {
-                self.program_counter = self.v_registers[0] as u16 + (n1 | n2 | n3);
+            (0xB, _, _, _) => {
+                self.program_counter = self.v_registers[0] as u16 + (opcode & 0xFFF);
             }
 
-            (0xC, reg_x, n1, n2) => {
-                self.v_registers[reg_x as usize] = rand::random::<u8>() & (n1 | n2) as u8;
+            (0xC, reg_x, _, _) => {
+                self.v_registers[reg_x as usize] = rand::random::<u8>() & (opcode & 0xFF) as u8;
             }
 
             (0xD, reg_x, reg_y, n) => {

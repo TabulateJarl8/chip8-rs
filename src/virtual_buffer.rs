@@ -33,7 +33,7 @@ impl VirtualDisplay {
     }
 
     pub fn clear(&mut self) {
-        self.buffer.clear();
+        self.buffer.fill(false);
     }
 
     pub fn to_framebuffer(&self) -> Vec<u32> {
