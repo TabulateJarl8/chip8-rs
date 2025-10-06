@@ -46,7 +46,9 @@ impl Chip8 {
     pub fn press_keys(&mut self, keys: &[Key]) {
         for key in keys {
             if let Some(key_index) = Self::map_key_to_index(*key) {
+                log::debug!("Pressing key: {:?}", key);
                 self.keys[key_index] = true;
+                log::debug!("{:?}", self.keys);
             }
         }
     }
@@ -54,29 +56,31 @@ impl Chip8 {
     pub fn release_keys(&mut self, keys: &[Key]) {
         for key in keys {
             if let Some(key_index) = Self::map_key_to_index(*key) {
+                log::debug!("Releasing key: {:?}", key);
                 self.keys[key_index] = false;
+                log::debug!("{:?}", self.keys);
             }
         }
     }
 
     fn map_key_to_index(key: Key) -> Option<usize> {
         match key {
-            Key::Key1 => Some(0),
-            Key::Key2 => Some(1),
-            Key::Key3 => Some(2),
-            Key::Key4 => Some(3),
-            Key::Q => Some(4),
-            Key::W => Some(5),
-            Key::E => Some(6),
-            Key::R => Some(7),
-            Key::A => Some(8),
-            Key::S => Some(9),
-            Key::D => Some(10),
-            Key::F => Some(11),
-            Key::Z => Some(12),
-            Key::X => Some(13),
-            Key::C => Some(14),
-            Key::V => Some(15),
+            Key::Key1 => Some(0x1),
+            Key::Key2 => Some(0x2),
+            Key::Key3 => Some(0x3),
+            Key::Key4 => Some(0xC),
+            Key::Q => Some(0x4),
+            Key::W => Some(0x5),
+            Key::E => Some(0x6),
+            Key::R => Some(0xD),
+            Key::A => Some(0x7),
+            Key::S => Some(0x8),
+            Key::D => Some(0x9),
+            Key::F => Some(0xE),
+            Key::Z => Some(0xA),
+            Key::X => Some(0x0),
+            Key::C => Some(0xB),
+            Key::V => Some(0xF),
             _ => None,
         }
     }
@@ -106,8 +110,8 @@ impl Chip8 {
     }
 
     fn execute(&mut self, opcode: u16) {
-        log::debug!("PC: {}", self.program_counter);
-        log::debug!("Executing opcode: 0x{:04x}", opcode);
+        // log::debug!("PC: {}", self.program_counter);
+        // log::debug!("Executing opcode: 0x{:04x}", opcode);
 
         let bit1 = (opcode & 0xF000) >> 12;
         let bit2 = (opcode & 0x0F00) >> 8;
@@ -144,7 +148,8 @@ impl Chip8 {
                 self.v_registers[reg as usize] = (opcode & 0xFF) as u8;
             }
             (7, reg, _, _) => {
-                self.v_registers[reg as usize] += (opcode & 0xFF) as u8;
+                let value = &mut self.v_registers[reg as usize];
+                *value = (*value).wrapping_add((opcode & 0xFF) as u8);
             }
             (8, reg_x, reg_y, 0) => {
                 self.v_registers[reg_x as usize] = self.v_registers[reg_y as usize];
@@ -183,8 +188,10 @@ impl Chip8 {
                 let vx = self.v_registers[reg_x as usize];
                 let vy = self.v_registers[reg_y as usize];
 
-                self.v_registers[0xF] = (vy > vx).into();
-                self.v_registers[reg_x as usize] = vy - vx;
+                let (new_value, overflow) = vy.overflowing_sub(vx);
+
+                self.v_registers[0xF] = overflow.into();
+                self.v_registers[reg_x as usize] = new_value;
             }
             (8, reg_x, _, 0xE) => {
                 let vx = self.v_registers[reg_x as usize];
@@ -219,6 +226,13 @@ impl Chip8 {
 
                 let x_coord = self.v_registers[reg_x as usize];
                 let y_coord = self.v_registers[reg_y as usize];
+
+                log::debug!(
+                    "Drawing sprite of length {} at {}, {}",
+                    sprite.len(),
+                    x_coord,
+                    y_coord,
+                );
 
                 if self
                     .window
