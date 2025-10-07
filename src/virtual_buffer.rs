@@ -55,7 +55,7 @@ impl VirtualDisplay {
         self.buffer[real_index]
     }
 
-    pub fn set_pixel(&mut self, mut x: usize, mut y: usize, state: bool) -> bool {
+    pub fn set_pixel(&mut self, mut x: usize, mut y: usize, set_on: bool) -> bool {
         x %= VIRTUAL_WIDTH;
         y %= VIRTUAL_HEIGHT;
 
@@ -68,12 +68,12 @@ impl VirtualDisplay {
         for y in start_y..end_y {
             for x in start_x..end_x {
                 let index = y * self.scaled_width + x;
-                if let Some(pixel) = self.buffer.get_mut(index) {
-                    if *pixel == true && state == false {
+                if let Some(pixel_on) = self.buffer.get_mut(index) {
+                    if *pixel_on && !set_on {
                         collision = true;
                     }
 
-                    *pixel ^= state;
+                    *pixel_on ^= set_on;
                 }
             }
         }
@@ -84,14 +84,13 @@ impl VirtualDisplay {
     pub fn draw_sprite(&mut self, x: usize, y: usize, num_rows: usize, pixels: &[u8]) -> bool {
         let mut collision = false;
 
-        for row in 0..num_rows {
-            let bits = pixels[row];
-            let coord_y = y + row;
+        for (row_index, row) in pixels.iter().enumerate().take(num_rows) {
+            let coord_y = y + row_index;
 
             for bit in 0..8 {
                 let coord_x = x + bit;
 
-                let value = bits & (1 << (7 - bit));
+                let value = row & (1 << (7 - bit));
                 if value > 0 {
                     collision |= self.set_pixel(coord_x, coord_y, true);
                 }

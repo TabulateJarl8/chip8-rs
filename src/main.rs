@@ -124,14 +124,12 @@ impl ApplicationHandler for App {
             } => {
                 if let Key::Named(NamedKey::Escape) = logical_key {
                     event_loop.exit();
-                    return;
-                } else if let Key::Character(str) = logical_key {
-                    if let Some(key_index) = Self::map_key_to_index(str) {
+                } else if let Key::Character(str) = logical_key
+                    && let Some(key_index) = Self::map_key_to_index(str) {
                         match state {
                             ElementState::Pressed => self.emulator.press_key(key_index),
                             ElementState::Released => self.emulator.release_key(key_index),
                         }
-                    }
                 }
             }
             WindowEvent::RedrawRequested => {
