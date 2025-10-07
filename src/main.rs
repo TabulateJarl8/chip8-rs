@@ -19,6 +19,7 @@ mod emulator;
 mod memory;
 mod stack;
 mod virtual_buffer;
+mod sound;
 
 const TARGET_CPU_FREQ: u64 = 700;
 const TIMER_FREQ: u64 = 60;

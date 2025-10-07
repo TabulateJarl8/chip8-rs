@@ -1,4 +1,4 @@
-use crate::{memory::Memory, stack::Stack, virtual_buffer::VirtualDisplay};
+use crate::{memory::Memory, sound::Speaker, stack::Stack, virtual_buffer::VirtualDisplay};
 
 const START_ADDR: u16 = 0x200;
 
@@ -14,6 +14,7 @@ pub struct Chip8 {
     window: VirtualDisplay,
     keys: [bool; 16],
     key_wait_register: Option<u8>,
+    speaker: Option<Speaker>,
 }
 
 impl Chip8 {
@@ -29,6 +30,7 @@ impl Chip8 {
             memory: Memory::new(),
             keys: [false; 16],
             key_wait_register: None,
+            speaker: Speaker::new(),
         }
     }
 
@@ -83,7 +85,17 @@ impl Chip8 {
         }
 
         if self.sound_timer > 0 {
+            // timer is currently active
+
+            if let Some(speaker) = &mut self.speaker && !speaker.is_playing() {
+                speaker.start();
+            }
             self.sound_timer -= 1;
+        } else {
+            // timer is not active, check if buzz is disabled
+            if let Some(speaker) = &mut self.speaker && speaker.is_playing() {
+                speaker.stop();
+            }
         }
     }
 
