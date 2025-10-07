@@ -141,7 +141,15 @@ impl VirtualDisplay {
     /// * `y` - The y-coordinate of the sprite's top-left corner
     /// * `num_rows` - The number of rows (bytes) in the sprite
     /// * `pixels` - The byte slice representing the sprite data
-    pub fn draw_sprite(&mut self, x: usize, y: usize, num_rows: usize, pixels: &[u8]) -> bool {
+    /// * `clipping` - whether or not sprites should be clipped or wrapped on the edge
+    pub fn draw_sprite(
+        &mut self,
+        x: usize,
+        y: usize,
+        num_rows: usize,
+        pixels: &[u8],
+        clip_sprite: bool,
+    ) -> bool {
         let mut collision = false;
 
         for (row_index, row) in pixels.iter().enumerate().take(num_rows) {

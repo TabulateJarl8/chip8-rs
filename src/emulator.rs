@@ -7,6 +7,28 @@ use crate::sound::Speaker;
 /// initialized to
 const START_ADDR: u16 = 0x200;
 
+bitflags::bitflags! {
+    #[derive(Debug)]
+    pub struct Quirks: u8 {
+        /// The AND, OR and XOR opcodes (`8xy1`, `8xy2` and `8xy3`) reset the flags register to zero
+        const VF_RESET = 0b00001;
+        /// The save and load opcodes (`Fx55` and `Fx65`) increment the index register
+        const MEMORY = 0b00010;
+        /// Sprites drawn at the bottom edge of the screen get clipped instead of wrapping around to the top of the screen
+        const CLIPPING = 0b00100;
+        /// The shift opcodes (`8xy6` and `8xyE`) only operate on `vX` instead of storing the shifted version of `vY` in `vX`
+        const SHIFTING = 0b01000;
+        /// The "jump to some address plus `v0`" instruction (`Bnnn`) doesn't use `v0`, but `vX` instead where `X` is the highest nibble of `nnn`
+        const JUMPING = 0b10000;
+    }
+}
+
+impl Default for Quirks {
+    fn default() -> Self {
+        Self::VF_RESET | Self::CLIPPING | Self::MEMORY
+    }
+}
+
 
 /// The main emulator state
 #[derive(Debug)]
@@ -34,6 +56,7 @@ pub struct Chip8 {
     /// Optional audio support
     #[cfg(feature = "audio")]
     speaker: Option<Speaker>,
+    quirks: Quirks,
 }
 
 impl Chip8 {
@@ -52,7 +75,20 @@ impl Chip8 {
             key_wait_register: None,
             #[cfg(feature = "audio")]
             speaker: Speaker::new(),
+            quirks: Default::default(),
         }
+    }
+
+    /// Consumes self and adds the given quirks, overriding anything set in the previous self
+    pub fn override_quirks(mut self, quirks: Quirks) -> Self {
+        self.quirks = quirks;
+        self
+    }
+
+    /// Consumes self and adds the given additional quirks on top of the default ones
+    pub fn add_quirks(mut self, quirks: Quirks) -> Self {
+        self.quirks |= quirks;
+        self
     }
 
     /// Returns a reference to the held window
@@ -213,14 +249,29 @@ impl Chip8 {
             (8, reg_x, reg_y, 1) => {
                 log::trace!("OR V{:X}, V{:X}", reg_x, reg_y);
                 self.v_registers[reg_x as usize] |= self.v_registers[reg_y as usize];
+
+                if self.quirks.contains(Quirks::VF_RESET) {
+                    // quirk: reset the vF register to 0 on OR
+                    self.v_registers[0xF] = 0;
+                }
             }
             (8, reg_x, reg_y, 2) => {
                 log::trace!("AND V{:X}, V{:X}", reg_x, reg_y);
                 self.v_registers[reg_x as usize] &= self.v_registers[reg_y as usize];
+
+                if self.quirks.contains(Quirks::VF_RESET) {
+                    // quirk: reset the vF register to 0 on AND
+                    self.v_registers[0xF] = 0;
+                }
             }
             (8, reg_x, reg_y, 3) => {
                 log::trace!("XOR V{:X}, V{:X}", reg_x, reg_y);
                 self.v_registers[reg_x as usize] ^= self.v_registers[reg_y as usize];
+
+                if self.quirks.contains(Quirks::VF_RESET) {
+                    // quirk: reset the vF register to 0 on XOR
+                    self.v_registers[0xF] = 0;
+                }
             }
             (8, reg_x, reg_y, 4) => {
                 log::trace!("ADD V{:X}, V{:X}", reg_x, reg_y);
@@ -240,13 +291,23 @@ impl Chip8 {
                 self.v_registers[reg_x as usize] = value;
                 self.v_registers[0xF] = (!overflow).into();
             }
-            (8, reg_x, _, 6) => {
+            (8, reg_x, reg_y, 6) => {
                 log::trace!("SHR V{:X}", reg_x);
-                let vx = self.v_registers[reg_x as usize];
+
+                let shifted = if self.quirks.contains(Quirks::SHIFTING) {
+                    // shifting quirk: only modifies vX
+                    let shifted_x = self.v_registers[reg_x as usize] >> 1;
+                    self.v_registers[reg_x as usize] = shifted_x;
+                    shifted_x
+                } else {
+                    // normal behavior: sets vX to vY and then shifts vX
+                    let shifted_y = self.v_registers[reg_y as usize] >> 1;
+                    self.v_registers[reg_x as usize] = shifted_y;
+                    shifted_y
+                };
 
                 // overflow register gets the least significant bit since it's the one chopped off
-                self.v_registers[reg_x as usize] >>= 1;
-                self.v_registers[0xF] = vx & 1;
+                self.v_registers[0xF] = shifted & 1;
             }
             (8, reg_x, reg_y, 7) => {
                 log::trace!("SUBN V{:X}, V{:X}", reg_x, reg_y);
@@ -258,13 +319,23 @@ impl Chip8 {
                 self.v_registers[reg_x as usize] = new_value;
                 self.v_registers[0xF] = (!overflow).into();
             }
-            (8, reg_x, _, 0xE) => {
+            (8, reg_x, reg_y, 0xE) => {
                 log::trace!("SHL V{:X}", reg_x);
-                let vx = self.v_registers[reg_x as usize];
+
+                let shifted = if self.quirks.contains(Quirks::SHIFTING) {
+                    // shifting quirk: only modifies vX
+                    let shifted_x = self.v_registers[reg_x as usize] << 1;
+                    self.v_registers[reg_x as usize] = shifted_x;
+                    shifted_x
+                } else {
+                    // normal behavior: sets vX to vY and then shifts vX
+                    let shifted_y = self.v_registers[reg_y as usize] << 1;
+                    self.v_registers[reg_x as usize] = shifted_y;
+                    shifted_y
+                };
 
                 // set overflow register to most significant bit
-                self.v_registers[reg_x as usize] <<= 1;
-                self.v_registers[0xF] = (vx >> 7) & 1;
+                self.v_registers[0xF] = (shifted >> 7) & 1;
             }
 
             (9, reg_x, reg_y, 0) => {
@@ -280,10 +351,19 @@ impl Chip8 {
                 self.index_register = val;
             }
 
-            (0xB, _, _, _) => {
+            (0xB, reg_x, _, _) => {
                 let val = opcode & 0xFFF;
                 log::trace!("JP V0, 0x{:04x}", val);
-                self.program_counter = self.v_registers[0] as u16 + val;
+
+                let reg_value = if self.quirks.contains(Quirks::JUMPING) {
+                    // jumping quirk: adds vX instead of v0
+                    self.v_registers[reg_x as usize]
+                } else {
+                    // normal behavior: adds v0
+                    self.v_registers[0]
+                };
+
+                self.program_counter = reg_value as u16 + val;
             }
 
             (0xC, reg_x, _, _) => {
@@ -307,7 +387,7 @@ impl Chip8 {
 
                 if self
                     .window
-                    .draw_sprite(x_coord as usize, y_coord as usize, num_rows, sprite)
+                    .draw_sprite(x_coord as usize, y_coord as usize, num_rows, sprite, self.quirks.contains(Quirks::CLIPPING))
                 {
                     self.v_registers[0xF] = 1;
                 } else {
@@ -375,6 +455,11 @@ impl Chip8 {
                     let addr = (self.index_register + reg) as usize;
                     self.memory[addr] = self.v_registers[reg as usize];
                 }
+
+                if self.quirks.contains(Quirks::MEMORY) {
+                    // quirk: save and load opcodes increment the index register
+                    self.index_register += reg_x + 1;
+                }
             }
 
             (0xF, reg_x, 6, 5) => {
@@ -382,6 +467,11 @@ impl Chip8 {
                 for reg in 0..=reg_x {
                     let addr = (self.index_register + reg) as usize;
                     self.v_registers[reg as usize] = self.memory[addr];
+                }
+
+                if self.quirks.contains(Quirks::MEMORY) {
+                    // quirk: save and load opcodes increment the index register
+                    self.index_register += reg_x + 1;
                 }
             }
 
