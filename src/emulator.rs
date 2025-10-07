@@ -1,23 +1,39 @@
 use crate::{memory::Memory, sound::Speaker, stack::Stack, virtual_buffer::VirtualDisplay};
 
+/// Where the user program should be loaded into memory, and what the program counter is
+/// initialized to
 const START_ADDR: u16 = 0x200;
 
+
+/// The main emulator state
 #[derive(Debug)]
 pub struct Chip8 {
+    /// The RAM
     memory: Memory,
+    /// 16 VX registers
     v_registers: [u8; 16],
+    /// Delay timer
     delay_timer: u8,
+    /// Sound timer
     sound_timer: u8,
+    /// Program counter
     program_counter: u16,
+    /// Special index (I) register
     index_register: u16,
+    /// The stack
     stack: Stack,
+    /// The virtualized window display buffer
     window: VirtualDisplay,
+    /// Array of which keys are currently pressed
     keys: [bool; 16],
+    /// This is Some when we are waiting on a keypress from the FX0A instruction
     key_wait_register: Option<u8>,
+    /// Optional audio support
     speaker: Option<Speaker>,
 }
 
 impl Chip8 {
+    /// Creates a new CHIP-8 emulator with default values
     pub fn new() -> Self {
         Self {
             window: VirtualDisplay::new(20),
@@ -34,10 +50,15 @@ impl Chip8 {
         }
     }
 
+    /// Returns a reference to the held window
     pub fn window(&self) -> &VirtualDisplay {
         &self.window
     }
 
+    /// Ticks the CPU and runs the Von Neumann decode-execute cycle
+    ///
+    /// Note that this doesn't do anything if currently waiting on a keypress from the user. See
+    /// [`Self::key_wait_register`]
     pub fn tick_cpu(&mut self) {
         // don't execute anything if waiting on a key release
         if self.key_wait_register.is_some() {
@@ -48,6 +69,7 @@ impl Chip8 {
         self.execute(opcode);
     }
 
+    /// Register a key as currently pressed within the emulator. Accepts a key index in the range of `0x0..=0xF`
     pub fn press_key(&mut self, key_index: usize) {
         if key_index > 0xF {
             log::warn!("Discarding out of range keypress: {}", key_index);
@@ -58,6 +80,7 @@ impl Chip8 {
         self.keys[key_index] = true;
     }
 
+    /// Register a key as currently released within the emulator. Accepts a key index in the range of `0x0..=0xF`
     pub fn release_key(&mut self, key_index: usize) {
         if key_index > 0xF {
             log::warn!("Discarding out of range key release: {}", key_index);
@@ -74,11 +97,13 @@ impl Chip8 {
         }
     }
 
+    /// Load ROM data into the emulator. Does not clear previously loaded data.
     pub fn load(&mut self, data: &[u8]) {
         let start = START_ADDR as usize;
         self.memory[start..start + data.len()].copy_from_slice(data);
     }
 
+    /// Tick the timers if they are greater than 0. This should happen at a rate of 60Hz
     pub fn tick_timers(&mut self) {
         if self.delay_timer > 0 {
             self.delay_timer -= 1;
@@ -99,6 +124,7 @@ impl Chip8 {
         }
     }
 
+    /// Fetch the current instruction pointed to by [`Self::program_counter`] from memory
     fn fetch(&mut self) -> u16 {
         let high = self.memory[self.program_counter as usize] as u16;
         let low = self.memory[(self.program_counter + 1) as usize] as u16;
@@ -108,8 +134,8 @@ impl Chip8 {
         opcode
     }
 
+    /// Executes an instruction
     fn execute(&mut self, opcode: u16) {
-        // log::debug!("PC: {}", self.program_counter);
         // log::debug!("Executing opcode: 0x{:04x}", opcode);
 
         let bit1 = (opcode & 0xF000) >> 12;
@@ -300,7 +326,7 @@ impl Chip8 {
                 }
             }
 
-            (_, _, _, _) => unimplemented!("Unimplemented opcode: 0x{:04x}", opcode),
+            (_, _, _, _) => log::error!("Unimplemented opcode: 0x{:04x}", opcode),
         }
     }
 }

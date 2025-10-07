@@ -1,5 +1,9 @@
 use std::ops::{Index, IndexMut, Range};
 
+/// The size of the CHIP-8 RAM
+const MEMORY_SIZE: usize = 4096;
+
+/// Font for characters `0x0`-`0xF`
 const FONT_BYTES: [u8; 80] = [
     0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
     0x20, 0x60, 0x20, 0x20, 0x70, // 1
@@ -19,14 +23,16 @@ const FONT_BYTES: [u8; 80] = [
     0xF0, 0x80, 0xF0, 0x80, 0x80, // F
 ];
 
+/// Represents the CHIP-8's memory
 #[derive(Debug)]
 pub struct Memory {
-    memory: [u8; 4096],
+    memory: [u8; MEMORY_SIZE],
 }
 
 impl Memory {
+    /// Constructs a new [`Memory`] with the font loaded at address 0
     pub fn new() -> Self {
-        let mut memory = [0; 4096];
+        let mut memory = [0; MEMORY_SIZE];
         // some programs expect font maps to be at 0x000
         memory[..FONT_BYTES.len()].copy_from_slice(&FONT_BYTES);
 
