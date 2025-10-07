@@ -1,3 +1,5 @@
+#![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+
 use clap::Parser;
 use winit::event_loop::{ControlFlow, EventLoop};
 
@@ -32,9 +34,18 @@ fn main() {
         }
     };
 
-    let event_loop = EventLoop::new().unwrap();
+    let event_loop = match EventLoop::new() {
+        Ok(v) => v,
+        Err(e) => {
+            log::error!("Error creating event loop: {:?}", e);
+            std::process::exit(1);
+        }
+    };
     event_loop.set_control_flow(ControlFlow::Wait);
 
     let mut app = App::new(data);
-    event_loop.run_app(&mut app).unwrap();
+    if let Err(e) = event_loop.run_app(&mut app) {
+        log::error!("Error running event loop: {:?}", e);
+        std::process::exit(1);
+    }
 }

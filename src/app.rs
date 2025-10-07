@@ -96,18 +96,29 @@ impl ApplicationHandler for App {
         // The window is an Arc in order to have an owned shared reference with the pixels plane
         log::info!("Creating window ({}x{})", width, height);
         let window = Arc::new(
-            event_loop
+            match event_loop
                 .create_window(
                     Window::default_attributes()
                         .with_title("CHIP-8 Emulator")
                         .with_inner_size(LogicalSize::new(width, height)),
-                )
-                .unwrap(),
+                ) {
+                    Ok(w) => w,
+                    Err(e) => {
+                        log::error!("Error constructing window: {:?}", e);
+                        std::process::exit(1);
+                    },
+                }
         );
 
         let size = window.inner_size();
         let surface_texture = SurfaceTexture::new(size.width, size.height, Arc::clone(&window));
-        let pixels = Pixels::new(width, height, surface_texture).expect("could not create pixels");
+        let pixels = match Pixels::new(width, height, surface_texture) {
+            Ok(p) => p,
+            Err(e) => {
+                log::error!("Error constructing pixel buffer: {:?}", e);
+                std::process::exit(1);
+            },
+        };
 
         self.pixels = Some(pixels);
         self.window = Some(window);
