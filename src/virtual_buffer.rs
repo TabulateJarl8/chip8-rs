@@ -55,7 +55,9 @@ impl VirtualDisplay {
         self.buffer[real_index]
     }
 
-    pub fn set_pixel(&mut self, mut x: usize, mut y: usize, set_on: bool) -> bool {
+    pub fn set_pixel(&mut self, mut x: usize, mut y: usize, state: bool) -> bool {
+        let collision = self.get_pixel(x, y) && state;
+
         x %= VIRTUAL_WIDTH;
         y %= VIRTUAL_HEIGHT;
 
@@ -64,16 +66,11 @@ impl VirtualDisplay {
         let end_x = (x + 1) * self.scale_factor;
         let end_y = (y + 1) * self.scale_factor;
 
-        let mut collision = false;
         for y in start_y..end_y {
             for x in start_x..end_x {
                 let index = y * self.scaled_width + x;
-                if let Some(pixel_on) = self.buffer.get_mut(index) {
-                    if *pixel_on && !set_on {
-                        collision = true;
-                    }
-
-                    *pixel_on ^= set_on;
+                if let Some(pixel) = self.buffer.get_mut(index) {
+                    *pixel ^= state;
                 }
             }
         }
