@@ -2,10 +2,9 @@ use std::fmt::Debug;
 
 const VIRTUAL_WIDTH: usize = 64;
 const VIRTUAL_HEIGHT: usize = 32;
-const SPRITE_WIDTH: usize = 8;
 
-const PIXEL_ON: u32 = 0xFFFFFF;
-const PIXEL_OFF: u32 = 0x1A1A1A;
+const PIXEL_ON: u32 = 0xFFFFFFFF;
+const PIXEL_OFF: u32 = 0x1A1A1AFF;
 
 pub struct VirtualDisplay {
     buffer: Vec<bool>,

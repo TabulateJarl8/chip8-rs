@@ -1,5 +1,3 @@
-use minifb::Key;
-
 use crate::{memory::Memory, stack::Stack, virtual_buffer::VirtualDisplay};
 
 const START_ADDR: u16 = 0x200;
@@ -43,45 +41,21 @@ impl Chip8 {
         self.decrement_counters();
     }
 
-    pub fn press_keys(&mut self, keys: &[Key]) {
-        for key in keys {
-            if let Some(key_index) = Self::map_key_to_index(*key) {
-                log::debug!("Pressing key: {:?}", key);
-                self.keys[key_index] = true;
-                log::debug!("{:?}", self.keys);
-            }
+    pub fn press_key(&mut self, key_index: usize) {
+        if key_index <= 0xF {
+            log::debug!("Pressing key: {}", key_index);
+            self.keys[key_index] = true;
+        } else {
+            log::warn!("Discarding out of range keypress: {}", key_index)
         }
     }
 
-    pub fn release_keys(&mut self, keys: &[Key]) {
-        for key in keys {
-            if let Some(key_index) = Self::map_key_to_index(*key) {
-                log::debug!("Releasing key: {:?}", key);
-                self.keys[key_index] = false;
-                log::debug!("{:?}", self.keys);
-            }
-        }
-    }
-
-    fn map_key_to_index(key: Key) -> Option<usize> {
-        match key {
-            Key::Key1 => Some(0x1),
-            Key::Key2 => Some(0x2),
-            Key::Key3 => Some(0x3),
-            Key::Key4 => Some(0xC),
-            Key::Q => Some(0x4),
-            Key::W => Some(0x5),
-            Key::E => Some(0x6),
-            Key::R => Some(0xD),
-            Key::A => Some(0x7),
-            Key::S => Some(0x8),
-            Key::D => Some(0x9),
-            Key::F => Some(0xE),
-            Key::Z => Some(0xA),
-            Key::X => Some(0x0),
-            Key::C => Some(0xB),
-            Key::V => Some(0xF),
-            _ => None,
+    pub fn release_key(&mut self, key_index: usize) {
+        if key_index <= 0xF {
+            log::debug!("Releasing key: {}", key_index);
+            self.keys[key_index] = false;
+        } else {
+            log::warn!("Discarding out of range key release: {}", key_index)
         }
     }
 
