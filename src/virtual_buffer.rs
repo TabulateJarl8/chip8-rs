@@ -163,12 +163,12 @@ impl VirtualDisplay {
                     collision |= self.set_pixel(coord_x, coord_y, true);
                 }
 
-                if coord_x == VIRTUAL_WIDTH - 1 {
+                if clip_sprite && coord_x == VIRTUAL_WIDTH - 1 {
                     break;
                 }
             }
 
-            if coord_y == VIRTUAL_HEIGHT - 1 {
+            if clip_sprite && coord_y == VIRTUAL_HEIGHT - 1 {
                 break;
             }
         }

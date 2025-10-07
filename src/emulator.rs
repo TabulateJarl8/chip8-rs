@@ -80,12 +80,14 @@ impl Chip8 {
     }
 
     /// Consumes self and adds the given quirks, overriding anything set in the previous self
+    #[allow(dead_code)]
     pub fn override_quirks(mut self, quirks: Quirks) -> Self {
         self.quirks = quirks;
         self
     }
 
     /// Consumes self and adds the given additional quirks on top of the default ones
+    #[allow(dead_code)]
     pub fn add_quirks(mut self, quirks: Quirks) -> Self {
         self.quirks |= quirks;
         self
