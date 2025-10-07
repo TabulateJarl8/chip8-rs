@@ -13,6 +13,7 @@ pub struct Chip8 {
     stack: Stack,
     window: VirtualDisplay,
     keys: [bool; 16],
+    key_wait_register: Option<u8>,
 }
 
 impl Chip8 {
@@ -27,6 +28,7 @@ impl Chip8 {
             stack: Stack::new(),
             memory: Memory::new(),
             keys: [false; 16],
+            key_wait_register: None,
         }
     }
 
@@ -35,25 +37,38 @@ impl Chip8 {
     }
 
     pub fn tick_cpu(&mut self) {
+        // don't execute anything if waiting on a key release
+        if self.key_wait_register.is_some() {
+            return;
+        }
+
         let opcode = self.fetch();
         self.execute(opcode);
     }
 
     pub fn press_key(&mut self, key_index: usize) {
-        if key_index <= 0xF {
-            log::debug!("Pressing key: {}", key_index);
-            self.keys[key_index] = true;
-        } else {
-            log::warn!("Discarding out of range keypress: {}", key_index)
+        if key_index > 0xF {
+            log::warn!("Discarding out of range keypress: {}", key_index);
+            return;
         }
+
+        log::debug!("Pressing key: {}", key_index);
+        self.keys[key_index] = true;
     }
 
     pub fn release_key(&mut self, key_index: usize) {
-        if key_index <= 0xF {
-            log::debug!("Releasing key: {}", key_index);
-            self.keys[key_index] = false;
-        } else {
-            log::warn!("Discarding out of range key release: {}", key_index)
+        if key_index > 0xF {
+            log::warn!("Discarding out of range key release: {}", key_index);
+            return;
+        }
+
+        log::debug!("Releasing key: {}", key_index);
+        self.keys[key_index] = false;
+
+        if let Some(reg_x) = self.key_wait_register {
+            log::debug!("Writing key index to register {}", reg_x);
+            self.v_registers[reg_x as usize] = key_index as u8;
+            self.key_wait_register = None;
         }
     }
 
@@ -232,20 +247,7 @@ impl Chip8 {
                 self.v_registers[reg_x as usize] = self.delay_timer;
             }
 
-            (0xF, reg_x, 0, 0xA) => {
-                let mut pressed = false;
-                for (index, &key) in self.keys.iter().enumerate() {
-                    if key {
-                        self.v_registers[reg_x as usize] = index as u8;
-                        pressed = true;
-                        break;
-                    }
-                }
-
-                if !pressed {
-                    self.program_counter -= 2;
-                }
-            }
+            (0xF, reg_x, 0, 0xA) => self.key_wait_register = Some(reg_x as u8),
 
             (0xF, reg_x, 1, 5) => {
                 self.delay_timer = self.v_registers[reg_x as usize];
