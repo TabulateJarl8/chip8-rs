@@ -10,22 +10,24 @@ const START_ADDR: u16 = 0x200;
 bitflags::bitflags! {
     #[derive(Debug)]
     pub struct Quirks: u8 {
-        /// The AND, OR and XOR opcodes (`8xy1`, `8xy2` and `8xy3`) reset the flags register to zero
-        const VF_RESET = 0b00001;
+        /// The AND, OR, and XOR opcodes (`8xy1`, `8xy2`, and `8xy3`) reset the flags register to zero
+        const VF_RESET     = 0b000001;
         /// The save and load opcodes (`Fx55` and `Fx65`) increment the index register
-        const MEMORY = 0b00010;
+        const MEMORY       = 0b000010;
+        /// Drawing sprites to the display waits for the vertical blank interrupt, limiting their speed to max 60 sprites per second
+        const DISPLAY_WAIT = 0b000100;
         /// Sprites drawn at the bottom edge of the screen get clipped instead of wrapping around to the top of the screen
-        const CLIPPING = 0b00100;
+        const CLIPPING     = 0b001000;
         /// The shift opcodes (`8xy6` and `8xyE`) only operate on `vX` instead of storing the shifted version of `vY` in `vX`
-        const SHIFTING = 0b01000;
+        const SHIFTING     = 0b010000;
         /// The "jump to some address plus `v0`" instruction (`Bnnn`) doesn't use `v0`, but `vX` instead where `X` is the highest nibble of `nnn`
-        const JUMPING = 0b10000;
+        const JUMPING      = 0b100000;
     }
 }
 
 impl Default for Quirks {
     fn default() -> Self {
-        Self::VF_RESET | Self::CLIPPING | Self::MEMORY
+        Self::VF_RESET | Self::DISPLAY_WAIT | Self::CLIPPING | Self::MEMORY
     }
 }
 
@@ -53,6 +55,8 @@ pub struct Chip8 {
     keys: [bool; 16],
     /// This is Some when we are waiting on a keypress from the FX0A instruction
     key_wait_register: Option<u8>,
+    /// Signifies when we are waiting for the next VBlank, see [`Quirks::DISPLAY_WAIT`]
+    waiting_for_vblank: bool,
     /// Optional audio support
     #[cfg(feature = "audio")]
     speaker: Option<Speaker>,
@@ -73,6 +77,7 @@ impl Chip8 {
             memory: Memory::new(),
             keys: [false; 16],
             key_wait_register: None,
+            waiting_for_vblank: false,
             #[cfg(feature = "audio")]
             speaker: Speaker::new(),
             quirks: Default::default(),
@@ -103,6 +108,12 @@ impl Chip8 {
     /// Note that this doesn't do anything if currently waiting on a keypress from the user. See
     /// [`Self::key_wait_register`]
     pub fn tick_cpu(&mut self) {
+        // don't execute anything if we're waiting on a VBlank
+        if self.waiting_for_vblank {
+            log::trace!("Waiting for VBlank, skipping CPU tick");
+            return;
+        }
+
         // don't execute anything if waiting on a key release
         if self.key_wait_register.is_some() {
             log::trace!("Waiting for keypress, skipping CPU tick");
@@ -149,6 +160,9 @@ impl Chip8 {
 
     /// Tick the timers if they are greater than 0. This should happen at a rate of 60Hz
     pub fn tick_timers(&mut self) {
+        // since this runs at 60Hz, it will limit sprites drawn to 60/second
+        self.waiting_for_vblank = false;
+
         if self.delay_timer > 0 {
             self.delay_timer -= 1;
             log::trace!("Delay timer ticked, new value: {}", self.delay_timer);
@@ -387,13 +401,15 @@ impl Chip8 {
                 let num_rows = n as usize;
                 let sprite = &self.memory[sprite_addr..sprite_addr + num_rows];
 
-                if self
+                let collision = self
                     .window
-                    .draw_sprite(x_coord as usize, y_coord as usize, num_rows, sprite, self.quirks.contains(Quirks::CLIPPING))
-                {
-                    self.v_registers[0xF] = 1;
-                } else {
-                    self.v_registers[0xF] = 0;
+                    .draw_sprite(x_coord as usize, y_coord as usize, num_rows, sprite, self.quirks.contains(Quirks::CLIPPING));
+
+                self.v_registers[0xF] = collision.into();
+
+                if self.quirks.contains(Quirks::DISPLAY_WAIT) {
+                    log::trace!("Display wait quirk; waiting for next VBlank");
+                    self.waiting_for_vblank = true;
                 }
             }
 
