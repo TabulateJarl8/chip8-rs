@@ -8,7 +8,7 @@ use crate::sound::Speaker;
 const START_ADDR: u16 = 0x200;
 
 bitflags::bitflags! {
-    #[derive(Debug)]
+    #[derive(Debug, Clone, Copy)]
     pub struct Quirks: u8 {
         /// The AND, OR, and XOR opcodes (`8xy1`, `8xy2`, and `8xy3`) reset the flags register to zero
         const VF_RESET     = 0b000001;

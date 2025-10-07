@@ -13,7 +13,7 @@ use winit::{
     window::{Window, WindowId},
 };
 
-use crate::emulator::Chip8;
+use crate::emulator::{Chip8, Quirks};
 
 /// Emulated CPU should default to a rate of 700Hz
 const TARGET_CPU_FREQ: u64 = 700;
@@ -36,8 +36,12 @@ pub struct App {
 
 impl App {
     /// Construct a new application with given ROM data
-    pub fn new(program_data: Vec<u8>) -> Self {
+    pub fn new(program_data: Vec<u8>, quirks: Option<Quirks>) -> Self {
         let mut emulator = Chip8::new();
+        if let Some(q) = quirks {
+            emulator = emulator.override_quirks(q);
+        }
+
         emulator.load(&program_data);
 
         Self {
