@@ -1,4 +1,7 @@
-use std::sync::Arc;
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use pixels::{Pixels, SurfaceTexture};
 use winit::{
@@ -17,10 +20,15 @@ mod memory;
 mod stack;
 mod virtual_buffer;
 
+const TARGET_CPU_FREQ: u64 = 700;
+const TIMER_FREQ: u64 = 60;
+
 struct App {
     window: Option<Arc<Window>>,
     pixels: Option<Pixels<'static>>,
     emulator: Chip8,
+    last_cpu_time: Instant,
+    last_timer_time: Instant,
 }
 
 impl App {
@@ -32,6 +40,8 @@ impl App {
             window: None,
             pixels: None,
             emulator,
+            last_cpu_time: Instant::now(),
+            last_timer_time: Instant::now(),
         }
     }
 
@@ -91,6 +101,9 @@ impl ApplicationHandler for App {
 
         self.pixels = Some(pixels);
         self.window = Some(window);
+
+        self.last_cpu_time = Instant::now();
+        self.last_timer_time = Instant::now();
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
@@ -122,13 +135,30 @@ impl ApplicationHandler for App {
                 }
             }
             WindowEvent::RedrawRequested => {
-                self.emulator.tick();
                 self.draw();
-                if let Some(window) = &self.window {
-                    window.request_redraw();
-                }
             }
             _ => (),
+        }
+    }
+
+    fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop) {
+        // CPU clock timer
+        let cpu_time = Duration::from_secs_f64(1.0 / TARGET_CPU_FREQ as f64);
+        while self.last_cpu_time.elapsed() >= cpu_time {
+            self.emulator.tick_cpu();
+            self.last_cpu_time += cpu_time;
+        }
+
+        // Timers run at 60Hz
+        let timer_time = Duration::from_secs_f64(1.0 / TIMER_FREQ as f64);
+        if self.last_timer_time.elapsed() >= timer_time {
+            self.emulator.tick_timers();
+            self.last_timer_time = Instant::now();
+        }
+
+        // Request redraw and sleep until next event
+        if let Some(window) = &self.window {
+            window.request_redraw();
         }
     }
 }
@@ -142,7 +172,7 @@ fn main() {
     let data = std::fs::read(filename).expect("Expected a path to a CHIP-8 program");
 
     let event_loop = EventLoop::new().unwrap();
-    event_loop.set_control_flow(ControlFlow::Poll);
+    event_loop.set_control_flow(ControlFlow::Wait);
 
     let mut app = App::new(data);
     event_loop.run_app(&mut app).unwrap();

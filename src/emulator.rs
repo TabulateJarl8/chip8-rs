@@ -34,11 +34,9 @@ impl Chip8 {
         &self.window
     }
 
-    pub fn tick(&mut self) {
+    pub fn tick_cpu(&mut self) {
         let opcode = self.fetch();
         self.execute(opcode);
-
-        self.decrement_counters();
     }
 
     pub fn press_key(&mut self, key_index: usize) {
@@ -64,7 +62,7 @@ impl Chip8 {
         self.memory[start..start + data.len()].copy_from_slice(data);
     }
 
-    fn decrement_counters(&mut self) {
+    pub fn tick_timers(&mut self) {
         if self.delay_timer > 0 {
             self.delay_timer -= 1;
         }
