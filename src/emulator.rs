@@ -1,4 +1,7 @@
-use crate::{memory::Memory, sound::Speaker, stack::Stack, virtual_buffer::VirtualDisplay};
+use crate::{memory::Memory, stack::Stack, virtual_buffer::VirtualDisplay};
+
+#[cfg(feature = "audio")]
+use crate::sound::Speaker;
 
 /// Where the user program should be loaded into memory, and what the program counter is
 /// initialized to
@@ -29,6 +32,7 @@ pub struct Chip8 {
     /// This is Some when we are waiting on a keypress from the FX0A instruction
     key_wait_register: Option<u8>,
     /// Optional audio support
+    #[cfg(feature = "audio")]
     speaker: Option<Speaker>,
 }
 
@@ -46,6 +50,7 @@ impl Chip8 {
             memory: Memory::new(),
             keys: [false; 16],
             key_wait_register: None,
+            #[cfg(feature = "audio")]
             speaker: Speaker::new(),
         }
     }
@@ -114,6 +119,7 @@ impl Chip8 {
         if self.sound_timer > 0 {
             // timer is currently active
 
+            #[cfg(feature = "audio")]
             if let Some(speaker) = &mut self.speaker && !speaker.is_playing() {
                 speaker.start();
             }
@@ -121,6 +127,7 @@ impl Chip8 {
             log::trace!("Sound timer ticked, new value: {}", self.sound_timer);
         } else {
             // timer is not active, check if buzz is disabled
+            #[cfg(feature = "audio")]
             if let Some(speaker) = &mut self.speaker && speaker.is_playing() {
                 speaker.stop();
             }

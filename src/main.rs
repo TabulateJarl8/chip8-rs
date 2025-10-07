@@ -8,9 +8,11 @@ use crate::app::App;
 mod app;
 mod emulator;
 mod memory;
-mod sound;
 mod stack;
 mod virtual_buffer;
+
+#[cfg(feature = "audio")]
+mod sound;
 
 /// Defines this program's command-line arguments
 #[derive(Parser, Debug)]
