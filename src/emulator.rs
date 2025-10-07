@@ -227,24 +227,26 @@ impl Chip8 {
                 let vx = self.v_registers[reg_x as usize];
                 let vy = self.v_registers[reg_y as usize];
 
-                self.v_registers[0xF] = vx.checked_add(vy).is_none().into();
                 self.v_registers[reg_x as usize] = vx.wrapping_add(vy);
+                self.v_registers[0xF] = vx.checked_add(vy).is_none().into();
             }
             (8, reg_x, reg_y, 5) => {
                 log::trace!("SUB V{:X}, V{:X}", reg_x, reg_y);
                 let vx = self.v_registers[reg_x as usize];
                 let vy = self.v_registers[reg_y as usize];
 
-                self.v_registers[0xF] = (vx > vy).into();
-                self.v_registers[reg_x as usize] = vx.wrapping_sub(vy);
+                let (value, overflow) = vx.overflowing_sub(vy);
+
+                self.v_registers[reg_x as usize] = value;
+                self.v_registers[0xF] = (!overflow).into();
             }
             (8, reg_x, _, 6) => {
                 log::trace!("SHR V{:X}", reg_x);
                 let vx = self.v_registers[reg_x as usize];
 
                 // overflow register gets the least significant bit since it's the one chopped off
-                self.v_registers[0xF] = vx & 1;
                 self.v_registers[reg_x as usize] >>= 1;
+                self.v_registers[0xF] = vx & 1;
             }
             (8, reg_x, reg_y, 7) => {
                 log::trace!("SUBN V{:X}, V{:X}", reg_x, reg_y);
@@ -253,16 +255,16 @@ impl Chip8 {
 
                 let (new_value, overflow) = vy.overflowing_sub(vx);
 
-                self.v_registers[0xF] = (!overflow).into();
                 self.v_registers[reg_x as usize] = new_value;
+                self.v_registers[0xF] = (!overflow).into();
             }
             (8, reg_x, _, 0xE) => {
                 log::trace!("SHL V{:X}", reg_x);
                 let vx = self.v_registers[reg_x as usize];
 
                 // set overflow register to most significant bit
-                self.v_registers[0xF] = (vx >> 7) & 1;
                 self.v_registers[reg_x as usize] <<= 1;
+                self.v_registers[0xF] = (vx >> 7) & 1;
             }
 
             (9, reg_x, reg_y, 0) => {
