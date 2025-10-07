@@ -35,14 +35,13 @@ impl VirtualDisplay {
         self.buffer.fill(false);
     }
 
-    pub fn to_framebuffer(&self) -> Vec<u32> {
-        self.buffer
-            .iter()
-            .map(|v| match v {
-                true => PIXEL_ON,
-                false => PIXEL_OFF,
-            })
-            .collect::<Vec<u32>>()
+    pub fn render_to_buffer(&self, frame: &mut [u8]) {
+        for (index, pixel_on) in self.buffer.iter().enumerate() {
+            let rgba = if *pixel_on { PIXEL_ON } else { PIXEL_OFF };
+
+            let start = index * 4;
+            frame[start..start + 4].copy_from_slice(&rgba.to_be_bytes());
+        }
     }
 
     pub fn get_pixel(&self, mut x: usize, mut y: usize) -> bool {

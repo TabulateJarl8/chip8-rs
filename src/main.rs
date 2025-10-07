@@ -38,12 +38,7 @@ impl App {
     fn draw(&mut self) {
         if let Some(pixels) = &mut self.pixels {
             let frame = pixels.frame_mut();
-            let buffer = self.emulator.window().to_framebuffer();
-
-            // copy RGBA bytes
-            for (dest, src) in frame.chunks_exact_mut(4).zip(buffer.iter()) {
-                dest.copy_from_slice(&src.to_be_bytes());
-            }
+            self.emulator.window().render_to_buffer(frame);
 
             if let Err(e) = pixels.render() {
                 log::error!("Rending failed: {:?}", e);
