@@ -62,6 +62,7 @@ impl Chip8 {
     pub fn tick_cpu(&mut self) {
         // don't execute anything if waiting on a key release
         if self.key_wait_register.is_some() {
+            log::trace!("Waiting for keypress, skipping CPU tick");
             return;
         }
 
@@ -107,6 +108,7 @@ impl Chip8 {
     pub fn tick_timers(&mut self) {
         if self.delay_timer > 0 {
             self.delay_timer -= 1;
+            log::trace!("Delay timer ticked, new value: {}", self.delay_timer);
         }
 
         if self.sound_timer > 0 {
@@ -116,6 +118,7 @@ impl Chip8 {
                 speaker.start();
             }
             self.sound_timer -= 1;
+            log::trace!("Sound timer ticked, new value: {}", self.sound_timer);
         } else {
             // timer is not active, check if buzz is disabled
             if let Some(speaker) = &mut self.speaker && speaker.is_playing() {
@@ -136,7 +139,7 @@ impl Chip8 {
 
     /// Executes an instruction
     fn execute(&mut self, opcode: u16) {
-        // log::debug!("Executing opcode: 0x{:04x}", opcode);
+        log::trace!("Executing opcode: 0x{:04x}", opcode);
 
         let bit1 = (opcode & 0xF000) >> 12;
         let bit2 = (opcode & 0x0F00) >> 8;
@@ -145,50 +148,75 @@ impl Chip8 {
 
         match (bit1, bit2, bit3, bit4) {
             (0, 0, 0, 0) => (),
-            (0, 0, 0xE, 0) => self.window.clear(),
-            (0, 0, 0xE, 0xE) => self.program_counter = self.stack.pop(),
+            (0, 0, 0xE, 0) => {
+                log::trace!("CLS");
+                self.window.clear()
+            }
+            (0, 0, 0xE, 0xE) => {
+                let addr = self.stack.pop();
+                log::trace!("RET to 0x{:04x}", addr);
+                self.program_counter = addr;
+            }
             (1, _, _, _) => {
-                self.program_counter = opcode & 0xFFF;
+                let addr = opcode & 0xFFF;
+                log::trace!("JP 0x{:04x}", addr);
+                self.program_counter = addr;
             }
             (2, _, _, _) => {
+                let addr = opcode & 0xFFF;
+                log::trace!("CALL 0x{:04x}", addr);
                 self.stack.push(self.program_counter);
-                self.program_counter = opcode & 0xFFF;
+                self.program_counter = addr;
             }
             (3, reg, _, _) => {
-                if self.v_registers[reg as usize] as u16 == opcode & 0xFF {
+                let val = (opcode & 0xFF) as u8;
+                log::trace!("SE V{:X}, {}", reg, val);
+                if self.v_registers[reg as usize] == val {
                     self.program_counter += 2;
                 }
             }
             (4, reg, _, _) => {
-                if self.v_registers[reg as usize] as u16 != opcode & 0xFF {
+                let val = (opcode & 0xFF) as u8;
+                log::trace!("SNE V{:X}, {}", reg, val);
+                if self.v_registers[reg as usize] != val {
                     self.program_counter += 2;
                 }
             }
             (5, reg_x, reg_y, 0) => {
+                log::trace!("SE V{:X}, V{:X}", reg_x, reg_y);
                 if self.v_registers[reg_x as usize] == self.v_registers[reg_y as usize] {
                     self.program_counter += 2;
                 }
             }
             (6, reg, _, _) => {
-                self.v_registers[reg as usize] = (opcode & 0xFF) as u8;
+                let val = (opcode & 0xFF) as u8;
+                log::trace!("LD V{:X}, {}", reg, val);
+                self.v_registers[reg as usize] = val;
             }
             (7, reg, _, _) => {
+                let val = (opcode & 0xFF) as u8;
+                log::trace!("ADD V{:X}, {}", reg, val);
                 let value = &mut self.v_registers[reg as usize];
-                *value = (*value).wrapping_add((opcode & 0xFF) as u8);
+                *value = (*value).wrapping_add(val);
             }
             (8, reg_x, reg_y, 0) => {
+                log::trace!("LD V{:X}, V{:X}", reg_x, reg_y);
                 self.v_registers[reg_x as usize] = self.v_registers[reg_y as usize];
             }
             (8, reg_x, reg_y, 1) => {
+                log::trace!("OR V{:X}, V{:X}", reg_x, reg_y);
                 self.v_registers[reg_x as usize] |= self.v_registers[reg_y as usize];
             }
             (8, reg_x, reg_y, 2) => {
+                log::trace!("AND V{:X}, V{:X}", reg_x, reg_y);
                 self.v_registers[reg_x as usize] &= self.v_registers[reg_y as usize];
             }
             (8, reg_x, reg_y, 3) => {
+                log::trace!("XOR V{:X}, V{:X}", reg_x, reg_y);
                 self.v_registers[reg_x as usize] ^= self.v_registers[reg_y as usize];
             }
             (8, reg_x, reg_y, 4) => {
+                log::trace!("ADD V{:X}, V{:X}", reg_x, reg_y);
                 let vx = self.v_registers[reg_x as usize];
                 let vy = self.v_registers[reg_y as usize];
 
@@ -196,6 +224,7 @@ impl Chip8 {
                 self.v_registers[reg_x as usize] = vx.wrapping_add(vy);
             }
             (8, reg_x, reg_y, 5) => {
+                log::trace!("SUB V{:X}, V{:X}", reg_x, reg_y);
                 let vx = self.v_registers[reg_x as usize];
                 let vy = self.v_registers[reg_y as usize];
 
@@ -203,6 +232,7 @@ impl Chip8 {
                 self.v_registers[reg_x as usize] = vx.wrapping_sub(vy);
             }
             (8, reg_x, _, 6) => {
+                log::trace!("SHR V{:X}", reg_x);
                 let vx = self.v_registers[reg_x as usize];
 
                 // overflow register gets the least significant bit since it's the one chopped off
@@ -210,6 +240,7 @@ impl Chip8 {
                 self.v_registers[reg_x as usize] >>= 1;
             }
             (8, reg_x, reg_y, 7) => {
+                log::trace!("SUBN V{:X}, V{:X}", reg_x, reg_y);
                 let vx = self.v_registers[reg_x as usize];
                 let vy = self.v_registers[reg_y as usize];
 
@@ -219,6 +250,7 @@ impl Chip8 {
                 self.v_registers[reg_x as usize] = new_value;
             }
             (8, reg_x, _, 0xE) => {
+                log::trace!("SHL V{:X}", reg_x);
                 let vx = self.v_registers[reg_x as usize];
 
                 // set overflow register to most significant bit
@@ -227,37 +259,42 @@ impl Chip8 {
             }
 
             (9, reg_x, reg_y, 0) => {
+                log::trace!("SNE V{:X}, V{:X}", reg_x, reg_y);
                 if self.v_registers[reg_x as usize] != self.v_registers[reg_y as usize] {
                     self.program_counter += 2;
                 }
             }
 
             (0xA, _, _, _) => {
-                self.index_register = opcode & 0xFFF;
+                let val = opcode & 0xFFF;
+                log::trace!("LD I, 0x{:04x}", val);
+                self.index_register = val;
             }
 
             (0xB, _, _, _) => {
-                self.program_counter = self.v_registers[0] as u16 + (opcode & 0xFFF);
+                let val = opcode & 0xFFF;
+                log::trace!("JP V0, 0x{:04x}", val);
+                self.program_counter = self.v_registers[0] as u16 + val;
             }
 
             (0xC, reg_x, _, _) => {
-                self.v_registers[reg_x as usize] = rand::random::<u8>() & (opcode & 0xFF) as u8;
+                let val = (opcode & 0xFF) as u8;
+                let random_byte = rand::random::<u8>();
+                log::trace!("RND V{:X}, {}", reg_x, val);
+                self.v_registers[reg_x as usize] = random_byte & val;
             }
 
             (0xD, reg_x, reg_y, n) => {
+                let x_coord = self.v_registers[reg_x as usize];
+                let y_coord = self.v_registers[reg_y as usize];
+                log::trace!(
+                    "DRW V{:X}, V{:X}, {} (draw {} rows at ({}, {}))",
+                    reg_x, reg_y, n, n, x_coord, y_coord
+                );
+
                 let sprite_addr = self.index_register as usize;
                 let num_rows = n as usize;
                 let sprite = &self.memory[sprite_addr..sprite_addr + num_rows];
-
-                let x_coord = self.v_registers[reg_x as usize];
-                let y_coord = self.v_registers[reg_y as usize];
-
-                log::debug!(
-                    "Drawing sprite of length {} at {}, {}",
-                    sprite.len(),
-                    x_coord,
-                    y_coord,
-                );
 
                 if self
                     .window
@@ -270,40 +307,51 @@ impl Chip8 {
             }
 
             (0xE, reg_x, 9, 0xE) => {
+                log::trace!("SKP V{:X}", reg_x);
                 if self.keys[self.v_registers[reg_x as usize] as usize] {
                     self.program_counter += 2;
                 }
             }
 
             (0xE, reg_x, 0xA, 1) => {
+                log::trace!("SKNP V{:X}", reg_x);
                 if !self.keys[self.v_registers[reg_x as usize] as usize] {
                     self.program_counter += 2;
                 }
             }
 
             (0xF, reg_x, 0, 7) => {
+                log::trace!("LD V{:X}, DT", reg_x);
                 self.v_registers[reg_x as usize] = self.delay_timer;
             }
 
-            (0xF, reg_x, 0, 0xA) => self.key_wait_register = Some(reg_x as u8),
+            (0xF, reg_x, 0, 0xA) => {
+                log::trace!("LD V{:X}, K (waiting for key)", reg_x);
+                self.key_wait_register = Some(reg_x as u8);
+            }
 
             (0xF, reg_x, 1, 5) => {
+                log::trace!("LD DT, V{:X}", reg_x);
                 self.delay_timer = self.v_registers[reg_x as usize];
             }
 
             (0xF, reg_x, 1, 8) => {
+                log::trace!("LD ST, V{:X}", reg_x);
                 self.sound_timer = self.v_registers[reg_x as usize];
             }
 
             (0xF, reg_x, 1, 0xE) => {
+                log::trace!("ADD I, V{:X}", reg_x);
                 self.index_register += self.v_registers[reg_x as usize] as u16;
             }
 
             (0xF, reg_x, 2, 9) => {
+                log::trace!("LD F, V{:X}", reg_x);
                 self.index_register = self.v_registers[reg_x as usize] as u16 * 5;
             }
 
             (0xF, reg_x, 3, 3) => {
+                log::trace!("LD B, V{:X}", reg_x);
                 let vx = self.v_registers[reg_x as usize];
                 let i = self.index_register as usize;
 
@@ -313,6 +361,7 @@ impl Chip8 {
             }
 
             (0xF, reg_x, 5, 5) => {
+                log::trace!("LD [I], V{:X}", reg_x);
                 for reg in 0..=reg_x {
                     let addr = (self.index_register + reg) as usize;
                     self.memory[addr] = self.v_registers[reg as usize];
@@ -320,6 +369,7 @@ impl Chip8 {
             }
 
             (0xF, reg_x, 6, 5) => {
+                log::trace!("LD V{:X}, [I]", reg_x);
                 for reg in 0..=reg_x {
                     let addr = (self.index_register + reg) as usize;
                     self.v_registers[reg as usize] = self.memory[addr];

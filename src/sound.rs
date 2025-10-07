@@ -54,12 +54,14 @@ impl Speaker {
 
     /// Starts a beep's playing
     pub fn start(&mut self) {
+        log::debug!("Starting sound");
         self.sink.play();
         self.is_playing = true;
     }
 
     /// Stops a beep's playing
     pub fn stop(&mut self) {
+        log::debug!("Stopping sound");
         self.sink.pause();
         self.is_playing = false;
     }

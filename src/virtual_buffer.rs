@@ -61,6 +61,7 @@ impl VirtualDisplay {
 
     /// Clears the entire display by turning off all pixels
     pub fn clear(&mut self) {
+        log::trace!("Clearing display");
         self.buffer.fill(false);
     }
 

@@ -21,6 +21,8 @@ fn main() {
     env_logger::init();
 
     let args = Args::parse();
+
+    log::info!("Loading program from: {}", args.input_file);
     let data = match std::fs::read(args.input_file) {
         Ok(v) => v,
         Err(e) => {

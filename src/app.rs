@@ -94,6 +94,7 @@ impl ApplicationHandler for App {
         let height = emu_window.scaled_height() as u32;
 
         // The window is an Arc in order to have an owned shared reference with the pixels plane
+        log::info!("Creating window ({}x{})", width, height);
         let window = Arc::new(
             event_loop
                 .create_window(
@@ -133,6 +134,7 @@ impl ApplicationHandler for App {
                     },
                 ..
             } => {
+                log::trace!("Keyboard Input: {:?}, {:?}", logical_key, state);
                 if let Key::Named(NamedKey::Escape) = logical_key {
                     // close the application on escape
                     event_loop.exit();
