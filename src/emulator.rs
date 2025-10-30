@@ -310,20 +310,19 @@ impl Chip8 {
             (8, reg_x, reg_y, 6) => {
                 log::trace!("SHR V{:X}", reg_x);
 
-                let shifted = if self.quirks.contains(Quirks::SHIFTING) {
+                if self.quirks.contains(Quirks::SHIFTING) {
+                    let lsb = self.v_registers[reg_x as usize] & 1;
                     // shifting quirk: only modifies vX
-                    let shifted_x = self.v_registers[reg_x as usize] >> 1;
-                    self.v_registers[reg_x as usize] = shifted_x;
-                    shifted_x
+                    self.v_registers[reg_x as usize] >>= 1;
+                    // overflow register gets the least significant bit since it's the one chopped off
+                    self.v_registers[0xF] = lsb;
                 } else {
+                    let lsb = self.v_registers[reg_y as usize] & 1;
                     // normal behavior: sets vX to vY and then shifts vX
-                    let shifted_y = self.v_registers[reg_y as usize] >> 1;
-                    self.v_registers[reg_x as usize] = shifted_y;
-                    shifted_y
-                };
-
-                // overflow register gets the least significant bit since it's the one chopped off
-                self.v_registers[0xF] = shifted & 1;
+                    self.v_registers[reg_x as usize] = self.v_registers[reg_y as usize] >> 1;
+                    // overflow register gets the least significant bit since it's the one chopped off
+                    self.v_registers[0xF] = lsb;
+                }
             }
             (8, reg_x, reg_y, 7) => {
                 log::trace!("SUBN V{:X}, V{:X}", reg_x, reg_y);
